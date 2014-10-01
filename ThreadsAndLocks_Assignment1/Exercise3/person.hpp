@@ -1,3 +1,6 @@
+#ifndef PERSON_HPP_
+#define PERSON_HPP_
+
 #include<chrono>
 #include<random>
 #include<thread>
@@ -21,6 +24,16 @@ class person {
 		simulation_time_t processing_time;
 		simulation_time_t waiting_time;
 		simulation_time_t processed_time;
+
+		// Added a default constructor
+		person() :
+			id(-1),
+			arrival_time(-1),
+			due_time(-1),
+			processing_time(-1),
+			waiting_time(-1),
+			processed_time(-1)
+		{}
 
 		person(int id, simulation_time_t current_time) :
 			id(id),
@@ -59,9 +72,17 @@ class person_generator {
 		/* generate a person and wait until he/she arrives; time synchronization is achieved using a similar waiting call in the consumer */
 		person gen_person_waiting() {
 			person p(++last_id, last_arrival_time);
-			std::this_thread::sleep_for(std::chrono::duration<double, std::ratio<1, 1000>>(p.arrival_time - last_arrival_time)); // VS 2013 bug
-			std::this_thread::sleep_for(std::chrono::duration_cast<std::chrono::milliseconds>(p.arrival_time - last_arrival_time)); // Tried to workaround the VS 2013 bug
+
+			// Chrono doesn't work properly in Visual Studio 2013, so I had to add a duration_cast to the sleep function
+			//std::this_thread::sleep_for(std::chrono::duration<double, std::ratio<1, 1000>>(p.arrival_time - last_arrival_time)); // VS 2013 bug
+			std::this_thread::sleep_for(std::chrono::duration_cast<std::chrono::milliseconds>
+				(std::chrono::duration<double, std::ratio<1, 1000>>(p.arrival_time - last_arrival_time)));
+
+			std::cout << "Generated person " << p.id << std::endl;
+
 			last_arrival_time = p.arrival_time;
 			return p;
 		}
 };
+
+#endif

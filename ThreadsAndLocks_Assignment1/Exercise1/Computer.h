@@ -1,4 +1,6 @@
-#pragma once
+#ifndef COMPUTER_H_
+#define COMPUTER_H_
+
 class Computer
 {
 public:
@@ -22,3 +24,4 @@ private:
 	unsigned int mId;
 };
 
+#endif

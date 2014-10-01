@@ -1,4 +1,5 @@
-#pragma once
+#ifndef INTERNETCAFE_H_
+#define INTERNETCAFE_H_
 
 #include <vector>
 #include <map>
@@ -34,3 +35,4 @@ private:
 	unsigned int mHireCost;
 };
 
+#endif
