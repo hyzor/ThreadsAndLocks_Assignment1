@@ -25,16 +25,6 @@ class person {
 		simulation_time_t waiting_time;
 		simulation_time_t processed_time;
 
-		// Added a default constructor
-		person() :
-			id(-1),
-			arrival_time(-1),
-			due_time(-1),
-			processing_time(-1),
-			waiting_time(-1),
-			processed_time(-1)
-		{}
-
 		person(int id, simulation_time_t current_time) :
 			id(id),
 			arrival_time(current_time + next_arrival_time(generator)),

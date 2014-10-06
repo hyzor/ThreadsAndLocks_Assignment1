@@ -10,7 +10,7 @@ public:
 
 	void AssignUser(const unsigned int userId);
 	void UnassignUser();
-	bool IsInUse();
+	const bool IsInUse();
 
 	void Update();
 

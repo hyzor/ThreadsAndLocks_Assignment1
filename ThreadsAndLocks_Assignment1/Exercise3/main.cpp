@@ -4,11 +4,23 @@
 #include <vector>
 #include <future>
 #include <mutex>
+#include <algorithm>
+#include <deque>
 
 #include "person.hpp"
 #include "Toilet.h"
 
 #define TIMESTEP 100
+
+struct ToiletQueueSorter
+{
+	bool ToiletQueueSorter::operator () (const person* a, const person* b)
+	{
+		double a_diff = (a->due_time - (a->arrival_time + a->waiting_time + a->processing_time));
+		double b_diff = (b->due_time - (b->arrival_time + b->waiting_time + b->processing_time));
+		return a_diff < b_diff;
+	}
+};
 
 void SimulatePersons(std::vector<person*>& persons, bool& appIsRunning)
 {
@@ -24,7 +36,7 @@ void SimulatePersons(std::vector<person*>& persons, bool& appIsRunning)
 	}
 }
 
-void SimulateToilet(Toilet* toilet, std::queue<person*>& personQueue, std::mutex& mtx, unsigned int numJobs, bool& appIsRunning)
+void SimulateToilet(Toilet* toilet, std::deque<person*>& personDeque, std::mutex& mtx, unsigned int numJobs, bool& appIsRunning)
 {
 	std::vector<double> waitingTimes;
 
@@ -35,22 +47,24 @@ void SimulateToilet(Toilet* toilet, std::queue<person*>& personQueue, std::mutex
 
 	person* curPersonInProcess = nullptr;
 
+	ToiletQueueSorter toiletQueueSorter;
+
 	while (toilet->IsRunning())
 	{
 		if (!toilet->HasClient())
 		{
 			if (mtx.try_lock())
 			{
-				if (personQueue.size() > 0)
+				if (personDeque.size() > 0)
 				{
-					person* nextPerson = personQueue.front();
+					person* nextPerson = personDeque.front();
 
 					// Check if the next person is not starving and will actually be able to make it in time
-					if ((nextPerson->waiting_time + nextPerson->processing_time) < nextPerson->due_time)
+					if ( (nextPerson->arrival_time + (nextPerson->waiting_time + nextPerson->processing_time)) < nextPerson->due_time)
 					{
 						toilet->SetClient(nextPerson->id);
 						curPersonInProcess = new person(*nextPerson);
-						personQueue.pop();
+						personDeque.pop_front();
 
 						waitingTimes.push_back(curPersonInProcess->waiting_time);
 
@@ -59,6 +73,8 @@ void SimulateToilet(Toilet* toilet, std::queue<person*>& personQueue, std::mutex
 					else
 					{
 						numJobsStarved++;
+						personDeque.pop_front();
+						std::cout << "Person " << nextPerson->id << " has starved!" << std::endl;
 					}
 				}
 
@@ -81,6 +97,10 @@ void SimulateToilet(Toilet* toilet, std::queue<person*>& personQueue, std::mutex
 					curPersonInProcess = nullptr;
 
 					numJobsFinished++;
+
+					std::sort(personDeque.begin(), personDeque.end(), toiletQueueSorter);
+
+					std::cout << "Sorted person queue" << std::endl;
 				}
 
 				std::this_thread::sleep_for(std::chrono::duration_cast<std::chrono::milliseconds>
@@ -112,9 +132,12 @@ void SimulateToilet(Toilet* toilet, std::queue<person*>& personQueue, std::mutex
 	std::cout << "Average waiting time: " << averageWaitingTime << std::endl << std::endl;
 }
 
-int main()
+int main(int argc, char* argv[])
 {
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+
+	// Random seed
+	srand(time(NULL));
 
 	bool appIsRunning = true;
 
@@ -125,24 +148,20 @@ int main()
 	person_generator PersonGenerator;
 
 	std::vector<person*> persons;
-	std::queue<int> personIdQueue;
-	//std::queue<person> mPersonQueue;
-	std::queue<person*> personQueue;
+	std::deque<person*> personDeque;
 
 	std::mutex mtx;
 
 	Toilet* toilet = new Toilet(0);
-	toilet->Init(personIdQueue);
+	toilet->Init();
 
-	//std::thread personGenThread;
 	std::thread personSimThread;
 
 	personSimThread = std::thread(&SimulatePersons, std::ref(persons), std::ref(appIsRunning));
 
 	// Consumer
 	std::thread toiletThread;
-	//toiletThread = std::thread(&Toilet::Simulate, toilet);
-	toiletThread = std::thread(&SimulateToilet, toilet, std::ref(personQueue), std::ref(mtx), numPersonsToGenerate, std::ref(appIsRunning));
+	toiletThread = std::thread(&SimulateToilet, toilet, std::ref(personDeque), std::ref(mtx), numPersonsToGenerate, std::ref(appIsRunning));
 
 	// Producer
 	while (persons.size() < numPersonsToGenerate)
@@ -154,31 +173,11 @@ int main()
 			newPerson->processed_time = 0.0;
 
 			persons.push_back(newPerson);
-			//mPersonIdQueue.push(newPerson.id);
-
-			// Update waiting times for all the persons
-// 			for (unsigned int i = 0; i < persons.size(); ++i)
-// 			{
-// 				persons[i]->waiting_time++;
-// 			}
-
-			//mPersonQueue.push(newPerson);
-			personQueue.push(newPerson);
+			personDeque.push_back(newPerson);
 
 			mtx.unlock();
 		}
 	}
-
-// 	while (toilet->IsRunning())
-// 	{
-// 		for (unsigned int i = 0; i < persons.size(); ++i)
-// 		{
-// 			persons[i]->waiting_time++;
-// 		}
-// 
-// 		std::this_thread::sleep_for(std::chrono::duration_cast<std::chrono::milliseconds>
-// 			(std::chrono::duration<double, std::ratio<1, 1000>>(100)));
-// 	}
 
 	personSimThread.join();
 	toiletThread.join();
@@ -192,7 +191,6 @@ int main()
 	}
 	persons.clear();
 
-	system("pause");
-	//std::cin.get();
+	std::cin.ignore();
 	return 0;
 }

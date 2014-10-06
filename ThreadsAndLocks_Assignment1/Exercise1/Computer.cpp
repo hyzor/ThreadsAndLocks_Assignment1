@@ -25,7 +25,7 @@ void Computer::AssignUser(const unsigned int userId)
 	mUsageTimer = 0;
 }
 
-bool Computer::IsInUse()
+const bool Computer::IsInUse()
 {
 	if (mCurUserId != -1)
 		return true;
@@ -49,6 +49,7 @@ const unsigned int Computer::GetUsageTimer()
 void Computer::UnassignUser()
 {
 	mCurUserId = -1;
+	mUsageTimer = 0;
 }
 
 const int Computer::GetCurUserId()

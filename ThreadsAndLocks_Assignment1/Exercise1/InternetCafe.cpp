@@ -1,7 +1,8 @@
 #include "InternetCafe.h"
 
 #include <iostream>
-
+#include <thread>
+#include "Shared.h"
 
 InternetCafe::InternetCafe()
 {
@@ -48,12 +49,15 @@ void InternetCafe::Update()
 		{
 			if (mComputers[i]->GetUsageTimer() >= mHireTimeLimit)
 			{
-				//std::cout << "Unassigning user " << mComputers[i]->GetCurUserId() << " using computer " << mComputers[i]->GetId() << std::endl;
-				mUserQueue.push(mComputers[i]->GetCurUserId());
+				std::cout << "Unassigning user " << mComputers[i]->GetCurUserId() << " at computer " << mComputers[i]->GetId() << std::endl;
+				mClientQueue.push(mComputers[i]->GetCurUserId());
 				mComputers[i]->UnassignUser();
 			}
 		}
 	}
+
+	std::this_thread::sleep_for(std::chrono::duration_cast<std::chrono::milliseconds>
+		(std::chrono::duration<double, std::ratio<1, 1000>>(TIMESTEP)));
 }
 
 void InternetCafe::SetHireLimit(unsigned int hireLimit)
@@ -66,16 +70,16 @@ void InternetCafe::SetHireCost(unsigned int hireCost)
 	mHireCost = hireCost;
 }
 
-bool InternetCafe::RequestComputer(unsigned int userId, unsigned int userMoney)
+bool InternetCafe::RequestComputer(unsigned int userId, unsigned int clientMoney, bool& clientIsRunning)
 {
 	//std::cout << userId << std::endl;
 	//mUserQueue.push(userId);
 
-	if (!mUserQueue.empty())
+	if (!mClientQueue.empty())
 	{
-		if (mUserQueue.front() == userId)
+		if (mClientQueue.front() == userId)
 		{
-			if (userMoney >= mHireCost)
+			if (clientMoney >= mHireCost)
 			{
 				//HireComputer(userId, )
 				unsigned int computerId = 0;
@@ -94,15 +98,16 @@ bool InternetCafe::RequestComputer(unsigned int userId, unsigned int userMoney)
 				if (computerFound)
 				{
 					HireComputer(userId, computerId);
-					//std::cout << "Hired computer " << computerId << " requested by user " << userId << std::endl;
-					mUserQueue.pop();
+					std::cout << "Hired computer " << computerId << " requested by user " << userId << " (money left: " << clientMoney - mHireCost << ")" << std::endl;
+					mClientQueue.pop();
 					return true;
 				}
 			}
 			else
 			{
-				//std::cout << "User " << userId << " has insufficient money" << std::endl;
-				mUserQueue.pop();
+				std::cout << "User " << userId << " has insufficient money!" << std::endl;
+				clientIsRunning = false;
+				mClientQueue.pop();
 			}
 		}
 	}
@@ -112,10 +117,34 @@ bool InternetCafe::RequestComputer(unsigned int userId, unsigned int userMoney)
 
 void InternetCafe::PutInQueue(unsigned int userId)
 {
-	mUserQueue.push(userId);
+	mClientQueue.push(userId);
 }
 
 const unsigned int InternetCafe::GetHireCost()
 {
 	return mHireCost;
+}
+
+const bool InternetCafe::HasComputersInUse()
+{
+	bool hasComputersInUse = false;
+
+	for (unsigned int i = 0; i < mComputers.size(); ++i)
+	{
+		if (mComputers[i]->IsInUse())
+		{
+			hasComputersInUse = true;
+			break;
+		}
+	}
+
+	return hasComputersInUse;
+}
+
+const bool InternetCafe::ClientQueueIsEmpty()
+{
+	if (mClientQueue.size() == 0)
+		return true;
+	else
+		return false;
 }

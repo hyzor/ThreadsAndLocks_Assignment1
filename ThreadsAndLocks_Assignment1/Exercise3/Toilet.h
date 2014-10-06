@@ -10,16 +10,16 @@ public:
 	Toilet(int id);
 	~Toilet();
 
-	void Init(std::queue<int>& personIdQueue);
+	void Init();
 	void Shutdown();
 
-	void Simulate();
+	//void Simulate();
 
-	void Update();
+	//void Update();
 
 	void SetClient(int clientId);
 
-	bool Request(int personId);
+	//bool Request(int personId);
 	const bool HasClient();
 
 	const int GetCurClientId();
@@ -29,7 +29,7 @@ public:
 
 private:
 	bool mIsRunning;
-	std::queue<int>* mPersonIdQueue;
+	//std::queue<int>* mPersonIdQueue;
 
 	int mCurClientId;
 	int mId;

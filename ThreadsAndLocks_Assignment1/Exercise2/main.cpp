@@ -1,34 +1,85 @@
 #include <iostream>
 #include <thread>
+#include <fstream>
+#include <atomic>
+#include <vector>
+#include <future>
+#include <mutex>
 
 #include "timer.h"
 
-// float TrapezeFunction(float x)
-// {
-// 
-// }
+// The numerical integration function is based off of the method explained in
+// http://www.programming-techniques.com/2011/09/numerical-methods-integration-of-given.html
+// written by Bibek Subedi
 
 float y(float x)
 {
 	return 4 / (1 + x * x);
 }
 
-void ThreadFunc(float& s, float x0, float i, float h, unsigned int& numTrapezesCalculated)
+void ThreadFunc(std::mutex& mtx, float& s, float x0, float h, float numTrapezes, unsigned int threadId, unsigned numThreads)
 {
-	s += 2 * y(x0 + i * h);
-	numTrapezesCalculated++;
+	float curTrapeze = (float)threadId + 1;
+	float trapezeTotals = 0.0f;
+
+	// First check if thread is valid
+	if (curTrapeze < numTrapezes)
+	{
+		// Thread calculates all the trapezes corresponding to this thread ID (and the trapezes that are a multiplier of its ID)
+		while (curTrapeze < numTrapezes)
+		{
+			trapezeTotals += 2 * y(x0 + curTrapeze * h);
+			curTrapeze += numThreads;
+		}
+
+		bool hasFinished = false;
+
+		while (!hasFinished)
+		{
+			// Now try to increase s (the global trapeze value)
+			if (mtx.try_lock())
+			{
+				s += trapezeTotals;
+
+				hasFinished = true;
+				mtx.unlock();
+			}
+		}
+	}
 }
 
-int main()
+void ThreadFunc_Start(float& s, float& h, float x0, float xn, float numTrapezes)
 {
-	unsigned int numThreads = 0;
-	unsigned int numTrapezes = 16;
+	h = y(xn - x0) / numTrapezes;
+	s = y(x0) + y(xn);
+}
 
-	std::cout << "Threads: ";
-	std::cin >> numThreads;
+void SerialFunc(float &s, float h, float curTrapeze, float x0, float xn)
+{
+	s += 2 * y(x0 + curTrapeze * h);
+}
 
-	std::cout << "Trapezes: ";
-	std::cin >> numTrapezes;
+int main(int argc, char* argv[])
+{
+	for (int i = 1; i < argc; ++i)
+	{
+		std::cout << std::atoi(argv[i]) << std::endl;
+	}
+
+	std::ofstream myFile;
+	myFile.open("Results.txt", std::ios::app);
+
+	unsigned int numThreads = 8;
+	unsigned int numTrapezes = 1024 * 1024;
+
+	if (argc > 2)
+	{
+		int arg_numThreads = std::atoi(argv[1]);
+		int arg_numTrapezes = std::atoi(argv[2]);
+
+		numThreads = arg_numThreads; 
+		numTrapezes = arg_numTrapezes;
+	}
 
 	std::cout << "Executing with " << numThreads << " threads and " << numTrapezes << " trapezes" << std::endl;
 
@@ -36,117 +87,48 @@ int main()
 
 	float x0 = 0;
 	float xn = 1;
-	float h, s;
-
-	timer.Start();
-	h = y(xn - x0) / numTrapezes;
-	s = y(x0) + y(xn);
+	float h;
+	float s;
 
 	std::thread* myThreads;
 	myThreads = new std::thread[numThreads];
 
-	unsigned int numTrapezesCalculated = 0;
+	std::mutex mtx;
 
-	// There are one or more threads available for every trapeze
-	if (numThreads >= numTrapezes - 1)
+	ThreadFunc_Start(s, h, x0, xn, (float)numTrapezes);
+
+	timer.Start();
+
+	if (numThreads > 0)
 	{
-		for (unsigned int i = 1; i < numTrapezes; ++i)
+		for (unsigned int i = 0; i < numThreads; ++i)
 		{
-			myThreads[i-1] = std::thread(ThreadFunc, std::ref(s), x0, i, h, std::ref(numTrapezesCalculated));
-		}
-
-		for (unsigned int i = 1; i < numTrapezes; ++i)
-		{
-			myThreads[i-1].join();
+			myThreads[i] = std::thread(ThreadFunc, std::ref(mtx), std::ref(s), x0, h, numTrapezes, i, numThreads);
 		}
 	}
-
-	else if (numThreads > 0)
-	{
-		// There is an even number of threads in proportion to the number of trapezes
-		// but there are less threads than the number of trapezes
-		if ((numTrapezes - 1) % numThreads == 0)
-		{
-			unsigned int numIterations = (numTrapezes - 1) / numThreads;
-
-			for (unsigned int i = 0; i < numIterations; ++i)
-			{
-				for (unsigned int j = 0; j < numThreads; ++j)
-				{
-					myThreads[j] = std::thread(ThreadFunc, std::ref(s), x0, ((i * numThreads) + j) + 1, h, std::ref(numTrapezesCalculated));
-				}
-
-				for (unsigned int j = 0; j < numThreads; ++j)
-				{
-					myThreads[j].join();
-				}
-			}
-		}
-
-		// There are more trapezes than there are threads and the threads
-		// are in an odd number in proportion to the number of trapezes (and there are threads to be executed)
-		else
-		{
-			unsigned int curTrapeze = 1;
-
-			while (numTrapezesCalculated < (numTrapezes - 1))
-			{
-				unsigned int trapezesLeft = (numTrapezes - 1) - numTrapezesCalculated;
-
-				// There are less trapezes left to calculate than the total amount of threads
-				if (trapezesLeft < numThreads)
-				{
-					for (unsigned int i = 0; i < trapezesLeft; ++i)
-					{
-						myThreads[i] = std::thread(ThreadFunc, std::ref(s), x0, curTrapeze, h, std::ref(numTrapezesCalculated));
-						curTrapeze++;
-					}
-
-					for (unsigned int i = 0; i < trapezesLeft; ++i)
-					{
-						myThreads[i].join();
-					}
-				}
-
-				// There are still more trapezes left to calculate than the total amount of threads
-				else
-				{
-					for (unsigned int i = 0; i < numThreads; ++i)
-					{
-						myThreads[i] = std::thread(ThreadFunc, std::ref(s), x0, curTrapeze, h, std::ref(numTrapezesCalculated));
-						curTrapeze++;
-					}
-
-					for (unsigned int i = 0; i < numThreads; ++i)
-					{
-						myThreads[i].join();
-					}
-				}
-			}
-		}
-	}
-
-	// No threads to be executed
 	else
 	{
 		for (unsigned int i = 1; i < numTrapezes; ++i)
 		{
-			ThreadFunc(s, x0, i, h, numTrapezesCalculated);
+			SerialFunc(std::ref(s), h, (float)i, x0, xn);
 		}
 	}
 
-// 	for (unsigned int i = 1; i < numTrapezes; ++i)
-// 	{
-// 		//s += 2 * y(x0 + i * h);
-// 		ThreadFunc(s, x0, i, h);
-// 	}
+	for (unsigned int i = 0; i < numThreads; ++i)
+	{
+		myThreads[i].join();
+	}
 
 	float integralValue = (h * 0.5f) * s;
 	timer.Stop();
 
 	std::cout << "Integral value: " << integralValue << std::endl;
 	std::cout << "Calculated in " << timer.Elapsed() << "ms" << std::endl;
-	system("pause");
+
+	if (myFile.is_open())
+	{
+		myFile << numThreads << " " << numTrapezes << " : " << integralValue << " " << timer.Elapsed() << "ms" << std::endl;
+	}
 
 	return 0;
 }

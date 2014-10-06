@@ -5,7 +5,7 @@
 Toilet::Toilet()
 {
 	mIsRunning = false;
-	mPersonIdQueue = nullptr;
+	//mPersonIdQueue = nullptr;
 	mCurClientId = -1;
 	mId = -1;
 }
@@ -21,30 +21,30 @@ Toilet::~Toilet()
 {
 }
 
-void Toilet::Simulate()
-{
-	while (mIsRunning)
-	{
-		std::cout << "Simulating toilet " << std::endl;
-	}
-}
+// void Toilet::Simulate()
+// {
+// 	while (mIsRunning)
+// 	{
+// 		std::cout << "Simulating toilet " << std::endl;
+// 	}
+// }
 
-void Toilet::Init(std::queue<int>& personIdQueue)
+void Toilet::Init()
 {
-	mPersonIdQueue = &personIdQueue;
+	//mPersonIdQueue = &personIdQueue;
 	mIsRunning = true;
 }
 
-bool Toilet::Request(int personId)
-{
-	if (!HasClient())
-	{
-		mPersonIdQueue->pop();
-		return true;
-	}
-	else
-		return false;
-}
+// bool Toilet::Request(int personId)
+// {
+// 	if (!HasClient())
+// 	{
+// 		mPersonIdQueue->pop();
+// 		return true;
+// 	}
+// 	else
+// 		return false;
+// }
 
 const int Toilet::GetCurClientId()
 {
@@ -61,13 +61,13 @@ const int Toilet::GetId()
 	return mId;
 }
 
-void Toilet::Update()
-{
-	if (HasClient())
-	{
-
-	}
-}
+// void Toilet::Update()
+// {
+// 	if (HasClient())
+// 	{
+// 
+// 	}
+// }
 
 void Toilet::SetClient(int clientId)
 {
